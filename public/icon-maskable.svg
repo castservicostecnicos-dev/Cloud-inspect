@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background for maskable (circle, teardrop, squircle safe) -->
+  <rect width="512" height="512" fill="url(#bgGrad)" />
+
+  <!-- Centered scaled group strictly inside 80% safe zone (x: 51 to 461, y: 51 to 461) -->
+  <g transform="translate(56, 56) scale(0.78)">
+    <!-- Shield / Card Body -->
+    <rect x="116" y="112" width="280" height="324" rx="36" fill="url(#shieldGrad)" stroke="#38bdf8" stroke-width="8" />
+
+    <!-- Top Clipboard Clip -->
+    <rect x="196" y="84" width="120" height="52" rx="16" fill="url(#accentGrad)" />
+    <circle cx="256" cy="110" r="10" fill="#0f172a" />
+
+    <!-- Document Checklist Rows -->
+    <rect x="160" y="180" width="44" height="44" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="4" />
+    <path d="M170 202 L178 210 L194 194" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="222" y="194" width="134" height="16" rx="8" fill="#94a3b8" />
+
+    <rect x="160" y="246" width="44" height="44" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="4" />
+    <path d="M170 268 L178 276 L194 260" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="222" y="260" width="112" height="16" rx="8" fill="#94a3b8" />
+
+    <!-- Big Prominent Checkmark Badge on lower right -->
+    <circle cx="340" cy="360" r="54" fill="url(#accentGrad)" stroke="#0f172a" stroke-width="8" />
+    <path d="M318 360 L334 376 L366 344" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+
+    <text x="256" y="474" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="900" letter-spacing="4" fill="#38bdf8" text-anchor="middle">CAST INSPECT</text>
+  </g>
+</svg>

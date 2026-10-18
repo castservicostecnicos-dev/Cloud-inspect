@@ -1,0 +1,9 @@
+# Cloudflare Pages / Workers Configuration for CAST Inspect
+name = "cloud-cast-inspect"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+# Environment variables can be configured here or in the Cloudflare Dashboard
+[vars]
+ENVIRONMENT = "production"

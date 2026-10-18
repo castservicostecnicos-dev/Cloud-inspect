@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Empresa",
+      "description": "Empresas cadastradas no ambiente multiempresa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tradeName": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "cnpj", "active"]
+    },
+    "User": {
+      "title": "Usuário",
+      "description": "Usuários do sistema com controle RBAC",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["DEV", "GERENTE", "SUPERVISOR", "TECNICO", "ADM_PREDIAL"] },
+        "docRegistration": { "type": "string" },
+        "phone": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "email", "role", "active"]
+    },
+    "Condominium": {
+      "title": "Condomínio",
+      "description": "Condomínios e blocos prediais cadastrados para vistorias",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "syndicName": { "type": "string" },
+        "syndicPhone": { "type": "string" },
+        "syndicEmail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "address"]
+    },
+    "InspectionTemplate": {
+      "title": "Modelo de Vistoria",
+      "description": "Checklists e modelos técnicos de vistoria periódica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "title"]
+    },
+    "Inspection": {
+      "title": "Vistoria",
+      "description": "Registros de vistorias técnicas periódicas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "condominiumId": { "type": "string" },
+        "blockId": { "type": "string" },
+        "templateId": { "type": "string" },
+        "inspectorId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"] },
+        "criticalItemsCount": { "type": "number" }
+      },
+      "required": ["id", "companyId", "condominiumId", "inspectorId", "date", "status"]
+    }
+  },
+  "firestore": {
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Empresas cadastradas no sistema"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Usuários do sistema"
+    },
+    "/condominiums/{condoId}": {
+      "schema": "Condominium",
+      "description": "Condomínios prediais"
+    },
+    "/templates/{templateId}": {
+      "schema": "InspectionTemplate",
+      "description": "Modelos de vistoria periódica"
+    },
+    "/inspections/{inspectionId}": {
+      "schema": "Inspection",
+      "description": "Vistorias periódicas realizadas"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    width: 100%;
+    max-width: 100vw;
+    min-height: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    position: relative;
+  }
+
+  body {
+    width: 100%;
+    max-width: 100vw;
+    min-height: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -webkit-overflow-scrolling: touch;
+    overflow-wrap: break-word;
+    position: relative;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    position: relative;
+  }
+}
+
+/* Áreas com overflow horizontal rolam suavemente sem travar o scroll vertical */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Garante que imagens, canvas e mídias nunca forcem largura maior que 100% */
+img, canvas, svg, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+pre, code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

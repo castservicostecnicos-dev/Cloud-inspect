@@ -1,0 +1,11 @@
+{
+  "name": "Cloud CAST Inspect",
+  "description": "Comprehensive multi-tenant platform for professional technical building inspections, photo documentation, and automated PDF report generation.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
