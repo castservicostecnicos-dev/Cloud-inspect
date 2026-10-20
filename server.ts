@@ -353,6 +353,16 @@ async function startServer() {
     res.json(updated);
   });
 
+  app.delete('/api/users/:id', (req, res) => {
+    const userRole = (req.headers['x-user-role'] as string) || '';
+    if (userRole && userRole !== 'DEV' && userRole !== 'GERENTE') {
+      return res.status(403).json({ error: 'Permissão negada para excluir usuários.' });
+    }
+    const ok = db.deleteUser(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Usuário não encontrado ou não pode ser excluído.' });
+    res.json({ success: true, message: 'Usuário excluído com sucesso.' });
+  });
+
   // Condominiums (isolated by companyId)
   app.get('/api/condominiums', (req, res) => {
     const companyId = getCompanyId(req);
@@ -388,6 +398,13 @@ async function startServer() {
     const updated = { ...cond, ...req.body, id: req.params.id, companyId };
     db.saveCondominium(companyId, updated);
     res.json(updated);
+  });
+
+  app.delete('/api/condominiums/:id', (req, res) => {
+    const companyId = getCompanyId(req);
+    const ok = db.deleteCondominium(companyId, req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Condomínio não encontrado para exclusão.' });
+    res.json({ success: true, message: 'Condomínio excluído com sucesso.' });
   });
 
   // Inspection Templates (isolated by companyId)
@@ -602,12 +619,15 @@ async function startServer() {
     });
   }
 
+  // Hydrate persistent data from Firebase Firestore before accepting requests
+  try {
+    await db.syncWithFirestore();
+  } catch (err: any) {
+    console.warn('[Server] Initial Firestore sync warning:', err?.message || err);
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[CAST Inspect] Server running on http://localhost:${PORT}`);
-    // Non-blocking Firestore synchronization in background
-    db.syncWithFirestore().catch((err: any) => {
-      console.warn('[Server] Firestore background sync warning:', err?.message || err);
-    });
   });
 }
 

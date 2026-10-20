@@ -84,6 +84,7 @@ export interface TemplateItem {
 export interface TemplateEnvironment {
   id: string;
   name: string;
+  tower?: string; // Torre / Bloco à qual o ambiente pertence (ex: 'TORRE 1', 'BLOCO A', 'ÁREA COMUM')
   order: number;
   items: TemplateItem[];
 }
@@ -126,6 +127,7 @@ export interface InspectionEnvironment {
   id: string;
   templateEnvId?: string;
   name: string;
+  tower?: string; // Torre / Bloco à qual o ambiente pertence
   order: number;
   items: InspectionItem[];
 }

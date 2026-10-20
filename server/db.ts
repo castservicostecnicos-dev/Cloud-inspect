@@ -879,6 +879,19 @@ class JsonDatabase {
     return false;
   }
 
+  deleteUser(id: string): boolean {
+    const user = this.data.users.find((u) => u.id === id);
+    if (!user || user.role === 'DEV') return false; // Perfil DEV nunca é deletado
+    const initialLen = this.data.users.length;
+    this.data.users = this.data.users.filter((u) => u.id !== id);
+    if (this.data.users.length < initialLen) {
+      this.save();
+      deleteDocumentFromFirestore('users', id);
+      return true;
+    }
+    return false;
+  }
+
   // --- Condominiums ---
   getCondominiums(companyId: string): Condominium[] {
     return this.data.condominiums.filter((c) => c.companyId === companyId);
@@ -899,6 +912,19 @@ class JsonDatabase {
     this.save();
     saveDocumentToFirestore('condominiums', cond.id, cond);
     return cond;
+  }
+
+  deleteCondominium(companyId: string, id: string): boolean {
+    const initialLen = this.data.condominiums.length;
+    this.data.condominiums = this.data.condominiums.filter(
+      (c) => !(c.id === id && (!companyId || c.companyId === companyId))
+    );
+    if (this.data.condominiums.length < initialLen) {
+      this.save();
+      deleteDocumentFromFirestore('condominiums', id);
+      return true;
+    }
+    return false;
   }
 
   // --- Templates ---

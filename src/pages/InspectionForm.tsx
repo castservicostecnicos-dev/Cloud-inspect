@@ -96,7 +96,9 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
   const [environments, setEnvironments] = useState<InspectionEnvironment[]>([]);
 
   // New Environment Input State
+  const [newEnvTower, setNewEnvTower] = useState('');
   const [newEnvName, setNewEnvName] = useState('');
+  const [activeTowerFilter, setActiveTowerFilter] = useState('TODAS');
 
   // New Item Input State per Environment
   const [newItemsByEnv, setNewItemsByEnv] = useState<{ [envId: string]: string }>({});
@@ -232,6 +234,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   id: `env_${Date.now()}_${eIdx}`,
                   templateEnvId: env.id,
                   name: env.name,
+                  tower: env.tower ? String(env.tower).trim().toUpperCase() : undefined,
                   order: env.order,
                   items: env.items.map((it, iIdx) => ({
                     id: `item_${Date.now()}_${eIdx}_${iIdx}`,
@@ -318,6 +321,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
         id: `env_${Date.now()}_${eIdx}`,
         templateEnvId: env.id,
         name: env.name,
+        tower: env.tower ? String(env.tower).trim().toUpperCase() : undefined,
         order: env.order,
         items: env.items.map((it, iIdx) => ({
           id: `item_${Date.now()}_${eIdx}_${iIdx}`,
@@ -355,6 +359,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
         id: `env_${baseTime}_${eIdx}`,
         templateEnvId: env.id,
         name: String(env.name || '').trim().toUpperCase(),
+        tower: env.tower ? String(env.tower).trim().toUpperCase() : undefined,
         order: eIdx + 1,
         items: (env.items || []).map((it: any, iIdx: number) => ({
           id: `item_${baseTime}_${eIdx}_${iIdx}`,
@@ -399,6 +404,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
               environments: parsed.environments.map((env: any, eIdx: number) => ({
                 id: env.id,
                 name: String(env.name || '').trim().toUpperCase(),
+                tower: env.tower ? String(env.tower).trim().toUpperCase() : undefined,
                 order: eIdx + 1,
                 items: (env.items || []).map((it: any, iIdx: number) => ({
                   id: it.id,
@@ -419,11 +425,14 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
         }
       }
 
+      const towerInfo = parsed.towers && parsed.towers.length > 1
+        ? `${parsed.towers.length} Torres (${parsed.towers.join(', ')}), `
+        : (parsed.towers && parsed.towers.length === 1 ? `Torre: ${parsed.towers[0]}, ` : '');
       const descInfo = parsed.totalWithDescription
-        ? `, com ${parsed.totalWithDescription} descrições na Coluna 3`
+        ? ` e ${parsed.totalWithDescription} descrições na Coluna 4`
         : '';
       setSpreadsheetSuccessMsg(
-        `Planilha "${file.name}" importada com sucesso: ${parsed.totalEnvironments} ambientes (Coluna 1) e ${parsed.totalItems} itens em maiúsculas (Coluna 2)${descInfo}!`
+        `Planilha "${file.name}" importada: ${towerInfo}${parsed.totalEnvironments} ambientes e ${parsed.totalItems} itens${descInfo}!`
       );
       setTimeout(() => setSpreadsheetSuccessMsg(null), 9000);
     };
@@ -457,14 +466,16 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     if (spreadsheetInputRef.current) spreadsheetInputRef.current.value = '';
   };
 
-  // Add a new Environment on the fly (optionally specifying name and afterIndex)
-  const handleAddEnvironment = (customName?: string, insertAfterIndex?: number) => {
+  // Add a new Environment on the fly (optionally specifying name, afterIndex and tower)
+  const handleAddEnvironment = (customName?: string, insertAfterIndex?: number, customTower?: string) => {
     const nameToUse = (customName !== undefined ? customName : newEnvName).trim();
     if (!nameToUse) return;
+    const towerToUse = (customTower !== undefined ? customTower : newEnvTower).trim();
 
     const createdEnv: InspectionEnvironment = {
       id: `env_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: nameToUse,
+      name: nameToUse.toUpperCase(),
+      tower: towerToUse ? towerToUse.toUpperCase() : undefined,
       order: environments.length + 1,
       items: [],
     };
@@ -483,11 +494,12 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     }
   };
 
-  // Add environment directly below a specific environment
+  // Add environment directly below a specific environment (inheriting tower)
   const handleAddEnvironmentBelow = (envIndex: number, envId: string) => {
     const name = (newEnvBelowByEnv[envId] || '').trim();
     if (!name) return;
-    handleAddEnvironment(name, envIndex);
+    const parentEnv = environments[envIndex];
+    handleAddEnvironment(name, envIndex, parentEnv?.tower);
     setNewEnvBelowByEnv((prev) => ({ ...prev, [envId]: '' }));
   };
 
@@ -733,6 +745,11 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
       inspectionIdToEdit || undefined
     );
   }, [selectedCondoId, environments, pastInspections, inspectionIdToEdit]);
+
+  // Distinct towers present in current environments
+  const distinctTowers = React.useMemo(() => {
+    return Array.from(new Set(environments.map((e) => e.tower).filter(Boolean) as string[]));
+  }, [environments]);
 
   // Save Inspection
   const handleSave = async (finalStatus: 'EM_ANDAMENTO' | 'CONCLUIDA') => {
@@ -1110,7 +1127,14 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
 
         {/* Ambient Creation Box */}
         <div className="bg-white border-2 border-dashed border-blue-200 rounded-2xl p-3 shadow-xs">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              value={newEnvTower}
+              onChange={(e) => setNewEnvTower(e.target.value.toUpperCase())}
+              placeholder="TORRE (EX: TORRE 1)"
+              className="w-full sm:w-44 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+            />
             <input
               type="text"
               value={newEnvName}
@@ -1127,13 +1151,50 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
             <button
               type="button"
               onClick={() => handleAddEnvironment()}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all shrink-0"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all shrink-0"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Criar Ambiente</span>
             </button>
           </div>
         </div>
+
+        {/* Tower Navigation Tabs if multiple towers exist */}
+        {distinctTowers.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTowerFilter('TODAS')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTowerFilter === 'TODAS'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              Todas as Torres ({environments.length} Ambientes)
+            </button>
+            {distinctTowers.map((tName) => {
+              const count = environments.filter((e) => (e.tower || 'TORRE ÚNICA') === tName).length;
+              return (
+                <button
+                  key={tName}
+                  type="button"
+                  onClick={() => setActiveTowerFilter(tName)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                    activeTowerFilter === tName
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🏢 {tName}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-800 font-extrabold">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* List of Created Environments */}
         {environments.length === 0 ? (
@@ -1142,24 +1203,59 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
             <p className="text-sm font-semibold text-slate-700">Nenhum ambiente adicionado ainda</p>
           </div>
         ) : (
-          environments.map((env, envIndex) => {
-            const currentItemInputValue = newItemsByEnv[env.id] || '';
+          (() => {
+            const filteredEnvs = environments.filter(
+              (e) => activeTowerFilter === 'TODAS' || (e.tower || 'TORRE ÚNICA') === activeTowerFilter
+            );
 
-            return (
-              <div
-                key={env.id}
-                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs"
-              >
-                {/* Environment Header */}
-                <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-md bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-                      {envIndex + 1}
-                    </span>
-                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider">
-                      Ambiente: {env.name}
-                    </h3>
-                  </div>
+            return filteredEnvs.map((env, filterIdx) => {
+              const envIndex = environments.findIndex((orig) => orig.id === env.id);
+              const currentItemInputValue = newItemsByEnv[env.id] || '';
+              const isFirstOfTower =
+                env.tower &&
+                (filterIdx === 0 || filteredEnvs[filterIdx - 1]?.tower !== env.tower);
+
+              return (
+                <React.Fragment key={env.id}>
+                  {isFirstOfTower && (
+                    <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white p-3.5 sm:p-4 rounded-2xl flex items-center justify-between shadow-xs mt-3 first:mt-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-base shadow-xs shrink-0">
+                          🏢
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide">
+                              Torre: {env.tower}
+                            </h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/25 text-blue-200 border border-blue-400/30">
+                              Torre / Bloco
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            Ambientes e itens inspecionados nesta torre
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    {/* Environment Header */}
+                    <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-md bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {envIndex + 1}
+                        </span>
+                        {env.tower && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-400/30 shrink-0">
+                            🏢 {env.tower}
+                          </span>
+                        )}
+                        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider truncate">
+                          Ambiente: {env.name}
+                        </h3>
+                      </div>
 
                   <div className="flex items-center gap-3">
                     <span className="text-[11px] text-slate-400 font-medium">
@@ -1250,9 +1346,16 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
 
                             {/* Campo Descrição & Ticket de Alerta */}
                             <div className="mb-3 space-y-1.5">
-                              <label className="block text-[11px] font-bold text-slate-700">
-                                Descrição do Item:
-                              </label>
+                              <div className="flex items-center justify-between">
+                                <label className="block text-[11px] font-bold text-slate-700">
+                                  Descrição / Procedimento (Coluna 4 da Planilha):
+                                </label>
+                                {item.description ? (
+                                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                    ✓ Carregada da Planilha
+                                  </span>
+                                ) : null}
+                              </div>
                               <textarea
                                 rows={2}
                                 value={item.description || ''}
@@ -1528,14 +1631,23 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   </div>
                 </div>
               </div>
-            );
-          })
+            </React.Fragment>
+              );
+            });
+          })()
         )}
 
         {/* Adicionar Novo Ambiente ao final */}
         {environments.length > 0 && (
           <div className="bg-slate-50 border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors rounded-2xl p-3 shadow-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                type="text"
+                value={newEnvTower}
+                onChange={(e) => setNewEnvTower(e.target.value.toUpperCase())}
+                placeholder="TORRE (EX: TORRE 1)"
+                className="w-full sm:w-44 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+              />
               <input
                 type="text"
                 value={newEnvName}
@@ -1552,7 +1664,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
               <button
                 type="button"
                 onClick={() => handleAddEnvironment()}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all shrink-0"
+                className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all shrink-0"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
                 <span>Criar Ambiente</span>

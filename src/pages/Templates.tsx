@@ -41,6 +41,7 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
   const [templates, setTemplates] = useState<InspectionTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedTmpl, setExpandedTmpl] = useState<string | null>(null);
+  const [expandedTowerFilter, setExpandedTowerFilter] = useState<{ [tmplId: string]: string }>({});
 
   // Modal State for New / Edit Template
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,7 +63,9 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
   const [pastedCsvText, setPastedCsvText] = useState('');
 
   // Manual addition inputs inside modal
+  const [newEnvTower, setNewEnvTower] = useState('');
   const [newEnvName, setNewEnvName] = useState('');
+  const [modalTowerFilter, setModalTowerFilter] = useState('TODAS');
   const [newItemsByEnv, setNewItemsByEnv] = useState<{ [envId: string]: string }>({});
 
   // Deletion in-app confirmation state (avoids iframe window.confirm blocks)
@@ -150,22 +153,23 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
     URL.revokeObjectURL(url);
   };
 
-  // Helper to export an existing template as CSV
+  // Helper to export an existing template as CSV (4 columns: Torre, Ambiente, Item, Descrição)
   const handleExportTemplateAsCsv = (tmpl: InspectionTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
-    const rows = [['Ambiente', 'Item']];
+    const rows = [['Torre', 'Ambiente', 'Item', 'Descrição']];
     tmpl.environments.forEach((env) => {
+      const towerName = env.tower || 'TORRE ÚNICA';
       if (env.items && env.items.length > 0) {
         env.items.forEach((it) => {
-          rows.push([env.name, it.name]);
+          rows.push([towerName, env.name, it.name, it.description || '']);
         });
       } else {
-        rows.push([env.name, '']);
+        rows.push([towerName, env.name, '', '']);
       }
     });
 
     const csvContent = rows
-      .map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(';'))
+      .map((r) => r.map((c) => `"${(c || '').replace(/"/g, '""')}"`).join(';'))
       .join('\r\n');
 
     const cleanTitle = tmpl.title
@@ -195,9 +199,10 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
       return;
     }
 
-    // Convert all loaded spreadsheet environments and items to uppercase
+    // Convert all loaded spreadsheet environments and items to uppercase, preserving tower grouping
     const upperEnvironments = (parsed.environments || []).map((env, eIdx) => ({
       ...env,
+      tower: env.tower ? String(env.tower).trim().toUpperCase() : undefined,
       name: String(env.name || '').trim().toUpperCase(),
       order: eIdx + 1,
       items: (env.items || []).map((it, iIdx) => ({
@@ -209,12 +214,15 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
     }));
 
     setEnvironments(upperEnvironments);
+    const towerInfo = parsed.towers && parsed.towers.length > 1
+      ? `${parsed.towers.length} Torres (${parsed.towers.join(', ')}), `
+      : (parsed.towers && parsed.towers.length === 1 ? `Torre: ${parsed.towers[0]}, ` : '');
     const descText = parsed.totalWithDescription
-      ? ` e ${parsed.totalWithDescription} descrições na Coluna 3`
+      ? ` e ${parsed.totalWithDescription} descrições na Coluna 4`
       : '';
     setCsvFeedback({
       type: 'success',
-      message: `${parsed.totalEnvironments} ambientes (Coluna 1) e ${parsed.totalItems} itens em maiúsculas (Coluna 2)${descText}!`,
+      message: `${towerInfo}${parsed.totalEnvironments} ambientes e ${parsed.totalItems} itens importados com sucesso${descText}!`,
       filename,
     });
 
@@ -227,7 +235,8 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
         .toUpperCase();
       setTitle(cleanName);
       if (!description.trim()) {
-        setDescription(`CHECKLIST COM ${parsed.totalEnvironments} AMBIENTES E ${parsed.totalItems} ITENS IMPORTADOS DA PLANILHA "${filename.toUpperCase()}".`);
+        const towerSuffix = parsed.towers && parsed.towers.length > 1 ? ` DISTRIBUÍDOS EM ${parsed.towers.length} TORRES` : '';
+        setDescription(`CHECKLIST COM ${parsed.totalEnvironments} AMBIENTES E ${parsed.totalItems} ITENS${towerSuffix} IMPORTADOS DA PLANILHA "${filename.toUpperCase()}".`);
       }
     }
   };
@@ -298,6 +307,7 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
     const createdEnv: TemplateEnvironment = {
       id: `tenv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: newEnvName.trim().toUpperCase(),
+      tower: newEnvTower.trim() ? newEnvTower.trim().toUpperCase() : undefined,
       order: environments.length + 1,
       items: [],
     };
@@ -356,7 +366,9 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
     setCsvFeedback(null);
     setIsPasteOpen(false);
     setPastedCsvText('');
+    setNewEnvTower('');
     setNewEnvName('');
+    setModalTowerFilter('TODAS');
     setNewItemsByEnv({});
     setIsModalOpen(true);
   };
@@ -668,71 +680,156 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
                 {/* Accordion Content: Hierarchy of Environments & Items */}
                 {isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        Estrutura do Checklist Predial
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          Total de {tmpl.environments.length} ambientes cadastrados
-                        </span>
-                        {canManageTemplates && (
-                          <button
-                            type="button"
-                            onClick={(e) => promptDeleteTemplate(tmpl.id, tmpl.title, e)}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded-lg transition-colors"
-                            title="Excluir este modelo"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Excluir Modelo</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    {(() => {
+                      const towersList = Array.from(
+                        new Set(tmpl.environments.map((e) => e.tower).filter(Boolean) as string[])
+                      );
+                      const currentFilter = expandedTowerFilter[tmpl.id] || 'TODAS';
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {tmpl.environments.map((env, eIdx) => (
-                        <div
-                          key={env.id}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs flex flex-col"
-                        >
-                          <div className="bg-slate-900 text-white px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-                            <span className="truncate">
-                              {eIdx + 1}. {env.name}
-                            </span>
-                            <span className="text-[10px] text-slate-300 font-normal shrink-0 ml-2">
-                              {env.items.length} {env.items.length === 1 ? 'item' : 'itens'}
-                            </span>
-                          </div>
+                      return (
+                        <>
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div>
+                              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                                Estrutura do Checklist Predial (Torre &rarr; Ambiente &rarr; Item &rarr; Descrição)
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                {towersList.length > 1
+                                  ? `${towersList.length} Torres (${towersList.join(', ')}) • `
+                                  : (towersList.length === 1 ? `Torre: ${towersList[0]} • ` : '')}
+                                {tmpl.environments.length} ambientes e {totalItems} itens cadastrados
+                              </span>
+                            </div>
 
-                          <div className="p-3 divide-y divide-slate-100 text-xs flex-1">
-                            {env.items.length === 0 ? (
-                              <p className="text-[11px] text-slate-400 italic py-1">
-                                Nenhum item cadastrado neste ambiente
-                              </p>
-                            ) : (
-                              env.items.map((it, iIdx) => (
-                                <div
-                                  key={it.id}
-                                  className="py-1.5 first:pt-0 last:pb-0 flex items-start justify-between gap-2"
+                            <div className="flex items-center gap-3">
+                              {canManageTemplates && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => promptDeleteTemplate(tmpl.id, tmpl.title, e)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded-lg transition-colors"
+                                  title="Excluir este modelo"
                                 >
-                                  <div className="min-w-0">
-                                    <span className="font-semibold text-slate-800 break-words">
-                                      {iIdx + 1}. {it.name}
-                                    </span>
-                                    {it.description ? (
-                                      <p className="text-[11px] text-slate-500 mt-0.5">
-                                        {it.description}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ))
-                            )}
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Excluir Modelo</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+
+                          {/* Tower Filter Tabs if more than 1 tower exists */}
+                          {towersList.length > 1 && (
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedTowerFilter((prev) => ({ ...prev, [tmpl.id]: 'TODAS' }))
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                                  currentFilter === 'TODAS'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
+                              >
+                                Todas as Torres ({tmpl.environments.length})
+                              </button>
+                              {towersList.map((tName) => {
+                                const count = tmpl.environments.filter(
+                                  (e) => (e.tower || 'TORRE ÚNICA') === tName
+                                ).length;
+                                return (
+                                  <button
+                                    key={tName}
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedTowerFilter((prev) => ({ ...prev, [tmpl.id]: tName }))
+                                    }
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1 ${
+                                      currentFilter === tName
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>🏢 {tName}</span>
+                                    <span className="text-[10px] opacity-80">({count})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {tmpl.environments
+                              .filter((e) => currentFilter === 'TODAS' || (e.tower || 'TORRE ÚNICA') === currentFilter)
+                              .map((env, eIdx, arr) => {
+                                const isFirstOfTower =
+                                  env.tower &&
+                                  (eIdx === 0 || arr[eIdx - 1]?.tower !== env.tower);
+
+                                return (
+                                  <React.Fragment key={env.id}>
+                                    {isFirstOfTower && (
+                                      <div className="col-span-full bg-gradient-to-r from-slate-900 to-blue-950 text-white px-3.5 py-2.5 rounded-xl flex items-center justify-between shadow-2xs mt-1 first:mt-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-md bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
+                                            🏢
+                                          </span>
+                                          <span className="text-xs font-bold uppercase tracking-wider">
+                                            Torre: {env.tower}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs flex flex-col">
+                                      <div className="bg-slate-900 text-white px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+                                        <div className="flex items-center gap-2 truncate">
+                                          <span className="truncate">
+                                            {eIdx + 1}. {env.name}
+                                          </span>
+                                          {env.tower && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-400/30 shrink-0">
+                                              🏢 {env.tower}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[10px] text-slate-300 font-normal shrink-0 ml-2">
+                                          {env.items.length} {env.items.length === 1 ? 'item' : 'itens'}
+                                        </span>
+                                      </div>
+
+                                      <div className="p-3 divide-y divide-slate-100 text-xs flex-1">
+                                        {env.items.length === 0 ? (
+                                          <p className="text-[11px] text-slate-400 italic py-1">
+                                            Nenhum item cadastrado neste ambiente
+                                          </p>
+                                        ) : (
+                                          env.items.map((it, iIdx) => (
+                                            <div
+                                              key={it.id}
+                                              className="py-1.5 first:pt-0 last:pb-0 flex items-start justify-between gap-2"
+                                            >
+                                              <div className="min-w-0">
+                                                <span className="font-semibold text-slate-800 break-words">
+                                                  {iIdx + 1}. {it.name}
+                                                </span>
+                                                {it.description ? (
+                                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                                    Descrição: {it.description}
+                                                  </p>
+                                                ) : null}
+                                              </div>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+                                  </React.Fragment>
+                                );
+                              })}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -906,13 +1003,13 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
                 {isPasteOpen && (
                   <div className="mt-3 pt-3 border-t border-emerald-200/80 space-y-2 animate-fadeIn">
                     <label className="block text-[11px] font-bold text-slate-800">
-                      Copie e cole as colunas (Coluna 1: Ambiente | Coluna 2: Item) de sua planilha:
+                      Copie e cole as colunas (Coluna 1: Torre | Coluna 2: Ambiente | Coluna 3: Item | Coluna 4: Descrição) de sua planilha:
                     </label>
                     <textarea
-                      rows={4}
+                      rows={5}
                       value={pastedCsvText}
                       onChange={(e) => setPastedCsvText(e.target.value)}
-                      placeholder={'Ambiente;Item\nHall de Entrada;Porta de Acesso\nHall de Entrada;Interfone\nGaragem;Portão\nGaragem;Extintor...'}
+                      placeholder={'Torre;Ambiente;Item;Descrição\nTORRE 1;HALL DE ENTRADA;PORTA DE ACESSO;Verificar fechadura e mola\nTORRE 1;HALL DE ENTRADA;INTERFONE;Testar áudio e botões\nTORRE 2;HALL DE ENTRADA;PORTA DE ACESSO;Verificar fechadura e mola\nÁREA COMUM;GARAGEM;PORTÃO ELETRÔNICO;Checar cremalheira e motor...'}
                       className="w-full bg-white border border-emerald-300 rounded-xl p-2.5 text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <div className="flex justify-end">
@@ -959,15 +1056,61 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
 
               {/* Environments and Items Preview / Editor */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-emerald-600" />
                     <span>Ambientes e Itens do Modelo ({environments.length} Ambientes &bull; {totalLoadedItems} Itens)</span>
                   </label>
                 </div>
 
-                {/* Add Environment Manually Input */}
-                <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                {/* Torre filter tabs in modal if multiple towers exist */}
+                {(() => {
+                  const modalTowers = Array.from(new Set(environments.map((e) => e.tower).filter(Boolean) as string[]));
+                  if (modalTowers.length <= 1) return null;
+                  return (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setModalTowerFilter('TODAS')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                          modalTowerFilter === 'TODAS'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        Todas as Torres ({environments.length})
+                      </button>
+                      {modalTowers.map((tName) => {
+                        const count = environments.filter((e) => (e.tower || 'TORRE ÚNICA') === tName).length;
+                        return (
+                          <button
+                            key={tName}
+                            type="button"
+                            onClick={() => setModalTowerFilter(tName)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1 ${
+                              modalTowerFilter === tName
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span>🏢 {tName}</span>
+                            <span className="text-[10px] opacity-80">({count})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Add Environment Manually Input with optional Torre */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <input
+                    type="text"
+                    value={newEnvTower}
+                    onChange={(e) => setNewEnvTower(e.target.value.toUpperCase())}
+                    placeholder="TORRE (EX: TORRE 1)"
+                    className="w-full sm:w-36 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                  />
                   <input
                     type="text"
                     value={newEnvName}
@@ -978,13 +1121,13 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
                         handleAddManualEnvironment();
                       }
                     }}
-                    placeholder="ADICIONAR NOVO AMBIENTE MANUALMENTE (EX: BARRILETE, SUBSOLO, COBERTURA...)"
+                    placeholder="AMBIENTE (EX: BARRILETE, SUBSOLO, COBERTURA...)"
                     className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none uppercase"
                   />
                   <button
                     type="button"
                     onClick={handleAddManualEnvironment}
-                    className="flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-xs shrink-0"
+                    className="flex items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-xs shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Ambiente</span>
@@ -999,91 +1142,108 @@ export const Templates: React.FC<TemplatesProps> = ({ onNavigate }) => {
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {environments.map((env, envIdx) => {
-                      const itemInputValue = newItemsByEnv[env.id] || '';
+                    {environments
+                      .filter((e) => modalTowerFilter === 'TODAS' || (e.tower || 'TORRE ÚNICA') === modalTowerFilter)
+                      .map((env) => {
+                        const envIdx = environments.findIndex((orig) => orig.id === env.id);
+                        const itemInputValue = newItemsByEnv[env.id] || '';
 
-                      return (
-                        <div
-                          key={env.id}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs"
-                        >
-                          {/* Environment header in modal */}
-                          <div className="bg-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between">
-                            <span className="uppercase tracking-wider">
-                              {envIdx + 1}. {env.name} ({env.items.length} itens)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveEnvironment(envIdx)}
-                              className="text-slate-400 hover:text-red-400 p-0.5 transition-colors"
-                              title="Remover este ambiente"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          {/* Items in environment */}
-                          <div className="p-2.5 space-y-2 bg-slate-50/40">
-                            {/* Items chips */}
-                            {env.items.length === 0 ? (
-                              <p className="text-[11px] text-slate-400 italic px-1">
-                                Nenhum item neste ambiente. Adicione abaixo:
-                              </p>
-                            ) : (
-                              <div className="flex flex-wrap gap-1.5">
-                                {env.items.map((it, itemIdx) => (
-                                  <span
-                                    key={it.id}
-                                    className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-800 shadow-2xs"
-                                  >
-                                    <span>
-                                      {itemIdx + 1}. {it.name}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveItem(envIdx, itemIdx)}
-                                      className="text-slate-400 hover:text-red-600"
-                                      title="Remover item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
+                        return (
+                          <div
+                            key={env.id}
+                            className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs"
+                          >
+                            {/* Environment header in modal */}
+                            <div className="bg-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between">
+                              <div className="flex items-center gap-2 truncate">
+                                {env.tower && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-400/30 shrink-0">
+                                    🏢 {env.tower}
                                   </span>
-                                ))}
+                                )}
+                                <span className="uppercase tracking-wider truncate">
+                                  {envIdx + 1}. {env.name} ({env.items.length} itens)
+                                </span>
                               </div>
-                            )}
-
-                            {/* Add Item to this environment */}
-                            <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200/60">
-                              <input
-                                type="text"
-                                value={itemInputValue}
-                                onChange={(e) =>
-                                  setNewItemsByEnv((prev) => ({
-                                    ...prev,
-                                    [env.id]: e.target.value.toUpperCase(),
-                                  }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleAddManualItem(envIdx);
-                                  }
-                                }}
-                                placeholder={`+ ADICIONAR ITEM EM "${env.name}"...`}
-                                className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium outline-none focus:ring-1 focus:ring-blue-500 uppercase"
-                              />
                               <button
                                 type="button"
-                                onClick={() => handleAddManualItem(envIdx)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg shadow-2xs shrink-0"
+                                onClick={() => handleRemoveEnvironment(envIdx)}
+                                className="text-slate-400 hover:text-red-400 p-0.5 transition-colors shrink-0 ml-2"
+                                title="Remover este ambiente"
                               >
-                                + Item
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
+
+                            {/* Items in environment */}
+                            <div className="p-2.5 space-y-2 bg-slate-50/40">
+                              {/* Items list with description */}
+                              {env.items.length === 0 ? (
+                                <p className="text-[11px] text-slate-400 italic px-1">
+                                  Nenhum item neste ambiente. Adicione abaixo:
+                                </p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {env.items.map((it, itemIdx) => (
+                                    <div
+                                      key={it.id}
+                                      className="flex items-start justify-between gap-2 p-2 rounded-lg bg-white border border-slate-200 text-xs shadow-2xs"
+                                    >
+                                      <div className="min-w-0">
+                                        <span className="font-bold text-slate-800">
+                                          {itemIdx + 1}. {it.name}
+                                        </span>
+                                        {it.description ? (
+                                          <p className="text-[11px] text-slate-500 mt-0.5">
+                                            Descrição: {it.description}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveItem(envIdx, itemIdx)}
+                                        className="text-slate-400 hover:text-red-600 p-1 transition-colors shrink-0"
+                                        title="Remover item"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Add Item to this environment */}
+                              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200/60">
+                                <input
+                                  type="text"
+                                  value={itemInputValue}
+                                  onChange={(e) =>
+                                    setNewItemsByEnv((prev) => ({
+                                      ...prev,
+                                      [env.id]: e.target.value.toUpperCase(),
+                                    }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleAddManualItem(envIdx);
+                                    }
+                                  }}
+                                  placeholder={`+ ADICIONAR ITEM EM "${env.name}"...`}
+                                  className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium outline-none focus:ring-1 focus:ring-blue-500 uppercase"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddManualItem(envIdx)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg shadow-2xs shrink-0"
+                                >
+                                  + Item
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 )}
               </div>

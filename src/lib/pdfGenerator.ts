@@ -204,8 +204,23 @@ export async function generateInspectionPdf(
   currentY += 13;
 
   // Render Environments and Items
+  let lastTowerPrinted = '';
   for (let envIndex = 0; envIndex < inspection.environments.length; envIndex++) {
     const env = inspection.environments[envIndex];
+    const currentTower = (env.tower || '').trim().toUpperCase();
+
+    // Tower Header Banner when tower changes
+    if (currentTower && currentTower !== lastTowerPrinted) {
+      lastTowerPrinted = currentTower;
+      checkPageBreak(16);
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(MARGIN_LEFT, currentY, USABLE_WIDTH, 8.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`TORRE / BLOCO: ${currentTower}`, MARGIN_LEFT + 4, currentY + 5.8);
+      currentY += 11.5;
+    }
 
     // Environment Title Header
     checkPageBreak(18);
@@ -215,8 +230,11 @@ export async function generateInspectionPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
+    const envHeaderTitle = currentTower
+      ? `AMBIENTE ${envIndex + 1}: ${env.name.toUpperCase()} [${currentTower}]`
+      : `AMBIENTE ${envIndex + 1}: ${env.name.toUpperCase()}`;
     doc.text(
-      `AMBIENTE ${envIndex + 1}: ${env.name.toUpperCase()}`,
+      envHeaderTitle,
       MARGIN_LEFT + 4,
       currentY + 5.2
     );

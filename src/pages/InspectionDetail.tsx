@@ -40,6 +40,7 @@ export const InspectionDetail: React.FC<InspectionDetailProps> = ({
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [testingPdf, setTestingPdf] = useState(false);
+  const [selectedTowerFilter, setSelectedTowerFilter] = useState('TODAS');
 
   useEffect(() => {
     async function load() {
@@ -304,26 +305,91 @@ export const InspectionDetail: React.FC<InspectionDetailProps> = ({
 
       {/* Environments and Items Breakdown */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-slate-900 px-1">
-          Ambientes e Itens Inspecionados
-        </h2>
-
-        {inspection.environments.map((env, eIdx) => (
-          <div
-            key={env.id}
-            className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs"
-          >
-            <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-xs sm:text-sm uppercase tracking-wider">
-                <span className="w-5 h-5 rounded bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold">
-                  {eIdx + 1}
-                </span>
-                <span>{env.name}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <h2 className="text-base font-bold text-slate-900">
+            Ambientes e Itens Inspecionados
+          </h2>
+          {(() => {
+            const towersList = Array.from(
+              new Set(inspection.environments.map((e) => e.tower).filter(Boolean) as string[])
+            );
+            if (towersList.length <= 1) return null;
+            return (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTowerFilter('TODAS')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                    selectedTowerFilter === 'TODAS'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Todas as Torres ({inspection.environments.length})
+                </button>
+                {towersList.map((tName) => {
+                  const count = inspection.environments.filter((e) => (e.tower || 'TORRE ÚNICA') === tName).length;
+                  return (
+                    <button
+                      key={tName}
+                      type="button"
+                      onClick={() => setSelectedTowerFilter(tName)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1 ${
+                        selectedTowerFilter === tName
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>🏢 {tName}</span>
+                      <span className="text-[10px] opacity-80">({count})</span>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="text-[11px] text-slate-400 font-normal">
-                {env.items.length} itens avaliados
-              </span>
-            </div>
+            );
+          })()}
+        </div>
+
+        {(() => {
+          const filteredEnvs = inspection.environments.filter(
+            (e) => selectedTowerFilter === 'TODAS' || (e.tower || 'TORRE ÚNICA') === selectedTowerFilter
+          );
+
+          return filteredEnvs.map((env, eIdx) => {
+            const isFirstOfTower =
+              env.tower &&
+              (eIdx === 0 || filteredEnvs[eIdx - 1]?.tower !== env.tower);
+
+            return (
+              <React.Fragment key={env.id}>
+                {isFirstOfTower && (
+                  <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-sm mt-4 first:mt-0">
+                    <div className="flex items-center gap-2.5 font-bold text-xs sm:text-sm uppercase tracking-wider">
+                      <span className="w-7 h-7 rounded-lg bg-blue-600 text-white text-xs flex items-center justify-center font-black">
+                        🏢
+                      </span>
+                      <span>Torre: {env.tower}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs sm:text-sm uppercase tracking-wider">
+                      <span className="w-5 h-5 rounded bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold">
+                        {eIdx + 1}
+                      </span>
+                      {env.tower && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-400/30 shrink-0">
+                          🏢 {env.tower}
+                        </span>
+                      )}
+                      <span>{env.name}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {env.items.length} itens avaliados
+                    </span>
+                  </div>
 
             <div className="p-4 divide-y divide-slate-100 space-y-4">
               {env.items.map((item, iIdx) => {
@@ -446,8 +512,11 @@ export const InspectionDetail: React.FC<InspectionDetailProps> = ({
               })}
             </div>
           </div>
-        ))}
-      </div>
+        </React.Fragment>
+      );
+    });
+  })()}
+</div>
 
       {/* General Notes and Signatures Card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">

@@ -59,7 +59,39 @@ Preencha exatamente estes campos:
 
 ---
 
-## 3. Publicação Alternativa via Linha de Comando (Wrangler CLI)
+## 3. Resolução de Erros de Build (Bun vs NPM no Cloudflare)
+
+Se o Cloudflare tentar rodar `bun install --frozen-lockfile` e retornar o erro `Unknown lockfile version`:
+- O arquivo de trava antigo `bun.lock` já foi **removido e adicionado ao `.gitignore`**.
+- O projeto utiliza **`package-lock.json`** e Node 22 com `npm install`.
+- Nas configurações de build do Cloudflare Pages (**Settings > Builds & deployments > Build configuration**), certifique-se de que o **Build command** seja:
+  `npm run build`
+
+---
+
+## 4. Estrutura das Planilhas de Vistoria (4 Colunas)
+
+O aplicativo foi calibrado para seguir rigorosamente a seguinte ordem ao carregar modelos a partir de planilhas Excel (`.xlsx`) ou `.csv`:
+
+| Coluna 1 | Coluna 2 | Coluna 3 | Coluna 4 |
+| :--- | :--- | :--- | :--- |
+| **Torre** | **Ambiente** | **Item** | **Descrição** |
+| TORRE 1 | HALL DE ENTRADA | PORTA DE ACESSO | Verificar fechadura, mola hidráulica e vedação |
+| TORRE 1 | HALL DE ENTRADA | INTERFONE | Testar comunicação com a portaria |
+| TORRE 1 | ELEVADORES | CABINE | Testar botoeira e interfone |
+| TORRE 2 | HALL DE ENTRADA | PORTA DE ACESSO | Verificar fechadura, mola hidráulica e vedação |
+| ÁREA COMUM | GARAGEM | PORTÃO ELETRÔNICO | Testar motores e fotocélulas |
+
+### Comportamento Multi-torre:
+1. **Criação da Torre**: Ao detectar uma torre diferente (ou quando há mais de uma torre), o sistema cria a seção da Torre correspondente.
+2. **Criação dos Ambientes na Torre**: Na sequência, cria todos os ambientes pertencentes àquela torre.
+3. **Criação dos Itens no Ambiente**: Em cada ambiente, cria os itens em maiúsculas na ordem exata da planilha.
+4. **Descrição do Item**: Cada item carrega a descrição da Coluna 4, ficando visível diretamente para o técnico vistoriador no checklist e no relatório PDF.
+5. **Download de Exemplo**: O botão "Planilha Exemplo (.xlsx)" na tela de Modelos de Vistoria gera e baixa automaticamente uma planilha com esse formato de 4 colunas pronto para preenchimento.
+
+---
+
+## 5. Publicação Alternativa via Linha de Comando (Wrangler CLI)
 
 Se preferir publicar direto do terminal sem conectar pelo GitHub:
 ```bash
