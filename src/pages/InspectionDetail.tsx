@@ -480,22 +480,33 @@ export const InspectionDetail: React.FC<InspectionDetailProps> = ({
 
                         {/* Strict 5-column grid: photos retain identical fixed size regardless of count */}
                         <div className="grid grid-cols-5 gap-2 max-w-2xl">
-                          {photos.map((ph, pIdx) => (
-                            <div
-                              key={ph.id}
-                              className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group"
-                              style={{ aspectRatio: '3/4' }}
-                            >
-                              <img
-                                src={ph.url}
-                                alt={ph.caption || `Foto #${pIdx + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute top-1 left-1 bg-slate-900/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                                #{pIdx + 1}
-                              </div>
-                            </div>
-                          ))}
+                          {photos.map((ph, pIdx) => {
+                            const viewerUrl = ph.cloudViewerUrl || `/api/photos/${ph.id}/view`;
+                            return (
+                              <a
+                                key={ph.id}
+                                href={viewerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="🔍 Clique para ver foto em alta resolução na nuvem"
+                                className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group block hover:ring-2 hover:ring-blue-500 hover:shadow-md transition-all cursor-pointer"
+                                style={{ aspectRatio: '3/4' }}
+                              >
+                                <img
+                                  src={ph.url}
+                                  alt={ph.caption || `Foto #${pIdx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                />
+                                <div className="absolute top-1 left-1 bg-slate-900/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                  #{pIdx + 1}
+                                </div>
+                                <div className="absolute inset-0 bg-blue-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white">
+                                  <span className="text-base">🔍</span>
+                                  <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-950/80 px-1 py-0.5 rounded">Nuvem</span>
+                                </div>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

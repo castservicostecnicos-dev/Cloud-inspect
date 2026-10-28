@@ -327,13 +327,23 @@ export async function generateInspectionPdf(
         currentY += Math.max(7, splitObs.length * 4 + 2);
       }
 
-      // Render item photos in chunks of 5
+      // Render item photos in chunks of 5 with clickable cloud links
       if (photosCount > 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Registros Fotográficos (${photosCount}):`, MARGIN_LEFT + 3, currentY + 3);
+        doc.setTextColor(30, 41, 59);
+        doc.text(
+          `Registros Fotográficos (${photosCount}) — Toque/clique na foto para abrir em alta resolução na nuvem:`,
+          MARGIN_LEFT + 3,
+          currentY + 3
+        );
         currentY += 5;
+
+        // Base URL helper for cloud viewer links
+        const baseAppUrl =
+          typeof window !== 'undefined' && window.location?.origin
+            ? window.location.origin
+            : 'https://ais-pre-gpaxdzzy7udubktd6jubrp-843360557528.us-east1.run.app';
 
         // Iterate through photos in chunks of 5
         for (let rowIdx = 0; rowIdx < photoRowsCount; rowIdx++) {
@@ -350,6 +360,8 @@ export async function generateInspectionPdf(
 
             if (photoIdx < endPhotoIdx) {
               const photo = item.photos[photoIdx];
+              const photoViewerUrl = photo.cloudViewerUrl || `${baseAppUrl}/api/photos/${photo.id}/view`;
+
               try {
                 // Add fixed size vertical image: exactly PDF_PHOTO_WIDTH x PDF_PHOTO_HEIGHT
                 doc.addImage(
@@ -363,23 +375,33 @@ export async function generateInspectionPdf(
                   'FAST'
                 );
 
+                // Make the entire photo thumbnail an active clickable hyperlink to the cloud viewer
+                doc.link(photoX, photoY, PDF_PHOTO_WIDTH, PDF_PHOTO_HEIGHT, { url: photoViewerUrl });
+
                 // Draw photo border
                 doc.setDrawColor(203, 213, 225);
-                doc.setLineWidth(0.2);
+                doc.setLineWidth(0.25);
                 doc.rect(photoX, photoY, PDF_PHOTO_WIDTH, PDF_PHOTO_HEIGHT);
 
-                // Small index tag on corner of photo
+                // Bottom Interactive Link Bar on photo thumbnail
                 doc.setFillColor(15, 23, 42);
-                doc.rect(photoX, photoY + PDF_PHOTO_HEIGHT - 3.8, 8.5, 3.8, 'F');
+                doc.rect(photoX, photoY + PDF_PHOTO_HEIGHT - 4.2, PDF_PHOTO_WIDTH, 4.2, 'F');
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(6);
-                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(5.2);
+                doc.setTextColor(56, 189, 248); // sky-400 link color
                 doc.text(
-                  `#${photoIdx + 1}`,
-                  photoX + 4.25,
-                  photoY + PDF_PHOTO_HEIGHT - 1.2,
+                  `#${photoIdx + 1} • Ver Detalhes 🔍`,
+                  photoX + PDF_PHOTO_WIDTH / 2,
+                  photoY + PDF_PHOTO_HEIGHT - 1.4,
                   { align: 'center' }
                 );
+
+                // Top-right zoom badge
+                doc.setFillColor(37, 99, 235);
+                doc.roundedRect(photoX + PDF_PHOTO_WIDTH - 6, photoY + 1.2, 5, 4, 0.8, 0.8, 'F');
+                doc.setFontSize(5);
+                doc.setTextColor(255, 255, 255);
+                doc.text('🔍', photoX + PDF_PHOTO_WIDTH - 3.5, photoY + 4, { align: 'center' });
               } catch (imgErr) {
                 console.error('Error rendering image to PDF:', imgErr);
                 // Fallback box if image failed to load

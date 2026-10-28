@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   deleteDoc,
   Firestore,
@@ -130,3 +131,22 @@ export async function deleteDocumentFromFirestore(
     console.error(`[Firestore] Failed to delete from ${collectionName}/${docId}:`, err.message);
   }
 }
+
+export async function getDocumentFromFirestore<T>(
+  collectionName: string,
+  docId: string
+): Promise<T | null> {
+  const db = getFirestoreDb();
+  if (!db) return null;
+  try {
+    const fetchPromise = getDoc(doc(db, collectionName, docId)).then((snap) => {
+      if (snap.exists()) return snap.data() as T;
+      return null;
+    });
+    return await withTimeout(fetchPromise, 8000, null);
+  } catch (err: any) {
+    console.warn(`[Firestore] Failed to read ${collectionName}/${docId}:`, err.message);
+    return null;
+  }
+}
+

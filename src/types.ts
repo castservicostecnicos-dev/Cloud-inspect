@@ -105,6 +105,8 @@ export interface InspectionPhoto {
   caption?: string;
   takenAt: string;
   isVertical: boolean;
+  cloudUrl?: string; // Direct cloud link to photo JPEG
+  cloudViewerUrl?: string; // Interactive high-resolution cloud viewer web page link
   driveFileId?: string; // ID of file in Google Drive
   driveUrl?: string; // Public / Web link to file in Google Drive
 }

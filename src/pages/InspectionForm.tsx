@@ -25,6 +25,7 @@ import {
   Sparkles,
   Clock,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -1536,34 +1537,56 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
 
                                 {/* Container with fixed 5-column grid */}
                                 <div className="grid grid-cols-5 gap-2 max-w-2xl">
-                                  {photos.map((ph, pIdx) => (
-                                    <div
-                                      key={ph.id}
-                                      className="relative rounded-lg overflow-hidden border border-slate-300 bg-slate-100 shadow-2xs group"
-                                      style={{ aspectRatio: '3/4' }}
-                                    >
-                                      <img
-                                        src={ph.url}
-                                        alt={ph.caption || `Foto #${pIdx + 1}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <span className="absolute bottom-0.5 right-0.5 bg-slate-900/80 text-white text-[8px] font-bold px-1 rounded">
-                                        #{pIdx + 1}
-                                      </span>
-
-                                      {/* Quick Delete button */}
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemovePhotoFromItem(envIndex, itemIndex, ph.id)
-                                        }
-                                        className="absolute top-0.5 right-0.5 bg-red-600/90 text-white p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Remover foto"
+                                  {photos.map((ph, pIdx) => {
+                                    const viewerUrl = ph.cloudViewerUrl || `/api/photos/${ph.id}/view`;
+                                    return (
+                                      <div
+                                        key={ph.id}
+                                        className="relative rounded-lg overflow-hidden border border-slate-300 bg-slate-100 shadow-2xs group"
+                                        style={{ aspectRatio: '3/4' }}
                                       >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  ))}
+                                        <a
+                                          href={viewerUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title="🔍 Ver foto em alta resolução na nuvem"
+                                          className="block w-full h-full cursor-pointer"
+                                        >
+                                          <img
+                                            src={ph.url}
+                                            alt={ph.caption || `Foto #${pIdx + 1}`}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                          />
+                                        </a>
+                                        <span className="absolute bottom-0.5 right-0.5 bg-slate-900/80 text-white text-[8px] font-bold px-1 rounded pointer-events-none">
+                                          #{pIdx + 1}
+                                        </span>
+
+                                        {/* Direct open link button */}
+                                        <a
+                                          href={viewerUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="absolute bottom-0.5 left-0.5 bg-blue-600/90 text-white p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title="Ver foto na nuvem"
+                                        >
+                                          <ExternalLink className="w-2.5 h-2.5" />
+                                        </a>
+
+                                        {/* Quick Delete button */}
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemovePhotoFromItem(envIndex, itemIndex, ph.id)
+                                          }
+                                          className="absolute top-0.5 right-0.5 bg-red-600/90 text-white p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title="Remover foto"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}

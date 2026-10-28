@@ -204,15 +204,39 @@ export const PhotoUploadModal: React.FC<PhotoUploadModalProps> = ({
           }
         }
 
-        newPhotos.push({
-          id: `ph_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        const photoId = `ph_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const newPhotoObj: InspectionPhoto = {
+          id: photoId,
           url: processed.dataUrl,
           caption: `Registro #${newPhotos.length + 1}`,
           takenAt: new Date().toISOString(),
           isVertical: true,
+          cloudUrl: `${origin}/api/photos/${photoId}`,
+          cloudViewerUrl: `${origin}/api/photos/${photoId}/view`,
           driveFileId,
           driveUrl,
-        });
+        };
+
+        // Immediate background upload to Cloud Firestore & server
+        fetch('/api/photos/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: photoId,
+            url: processed.dataUrl,
+            caption: newPhotoObj.caption,
+            takenAt: newPhotoObj.takenAt,
+            isVertical: true,
+            inspectionId,
+            environmentName,
+            itemName,
+            companyId: company?.id,
+            companyName: company?.name,
+          }),
+        }).catch((err) => console.warn('Background photo upload deferred:', err));
+
+        newPhotos.push(newPhotoObj);
       }
 
       setLocalPhotos(newPhotos);
@@ -386,17 +410,28 @@ export const PhotoUploadModal: React.FC<PhotoUploadModalProps> = ({
                     <span className="text-[10px] truncate font-medium">
                       {photo.caption || `Registro ${index + 1}`}
                     </span>
-                    {photo.driveUrl && (
+                    <div className="flex items-center gap-1.5 ml-1 shrink-0">
                       <a
-                        href={photo.driveUrl}
+                        href={photo.cloudViewerUrl || `/api/photos/${photo.id}/view`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-white hover:text-emerald-300 ml-1 shrink-0"
-                        title="Abrir no Google Drive"
+                        className="text-white hover:text-cyan-300 p-0.5 rounded bg-black/40 hover:bg-black/60 transition-colors"
+                        title="Abrir em Alta Resolução na Nuvem (Visualizador Interativo)"
                       >
                         <ExternalLink className="w-3 h-3" />
                       </a>
-                    )}
+                      {photo.driveUrl && (
+                        <a
+                          href={photo.driveUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-white hover:text-emerald-300 p-0.5 rounded bg-black/40 hover:bg-black/60 transition-colors"
+                          title="Abrir no Google Drive"
+                        >
+                          <HardDrive className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

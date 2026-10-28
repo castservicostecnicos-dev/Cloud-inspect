@@ -2,6 +2,12 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.js';
+import {
+  storePhoto,
+  getPhotoBuffer,
+  getPhotoMetadata,
+  generatePhotoViewerHtml,
+} from './server/photos.js';
 
 async function startServer() {
   const app = express();
@@ -476,6 +482,48 @@ async function startServer() {
     res.json(inspection);
   });
 
+  // Helper to persist inspection photos into cloud Firestore & disk and assign cloud links
+  const syncInspectionPhotos = (inspection: any, req: express.Request) => {
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol || 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    if (Array.isArray(inspection.environments)) {
+      for (const env of inspection.environments) {
+        if (Array.isArray(env.items)) {
+          for (const item of env.items) {
+            if (Array.isArray(item.photos)) {
+              for (const photo of item.photos) {
+                if (photo && photo.id) {
+                  photo.cloudUrl = `${baseUrl}/api/photos/${photo.id}`;
+                  photo.cloudViewerUrl = `${baseUrl}/api/photos/${photo.id}/view`;
+                  storePhoto({
+                    id: photo.id,
+                    url: photo.url,
+                    caption: photo.caption,
+                    takenAt: photo.takenAt,
+                    isVertical: photo.isVertical,
+                    inspectionId: inspection.id,
+                    inspectionCode: inspection.id,
+                    condominiumName: inspection.condominiumName,
+                    tower: env.tower,
+                    environmentName: env.name,
+                    itemName: item.name,
+                    itemStatus: item.status,
+                    companyId: inspection.companyId,
+                    observations: item.observations,
+                  }).catch((err) => {
+                    console.warn(`[Photos] Background cloud save error for photo ${photo.id}:`, err?.message || err);
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
   app.post('/api/inspections', (req, res) => {
     const companyId = getCompanyId(req);
     const data = req.body;
@@ -499,6 +547,7 @@ async function startServer() {
       environments: data.environments || [],
     };
 
+    syncInspectionPhotos(newInspection, req);
     const saved = db.saveInspection(companyId, newInspection);
     res.status(201).json(saved);
   });
@@ -517,6 +566,7 @@ async function startServer() {
       companyId,
     };
 
+    syncInspectionPhotos(updated, req);
     const saved = db.saveInspection(companyId, updated);
     res.json(saved);
   });
@@ -543,11 +593,103 @@ async function startServer() {
     inspections.forEach((insp) => {
       insp.companyId = companyId;
       insp.syncStatus = 'synced';
+      syncInspectionPhotos(insp, req);
       db.saveInspection(companyId, insp);
       synced.push(insp.id);
     });
 
     res.json({ status: 'ok', syncedCount: synced.length, ids: synced });
+  });
+
+  // --- CLOUD PHOTO STORAGE & HIGH-RESOLUTION VIEWER ENDPOINTS ---
+
+  // Upload single photo with inspection context to cloud Firestore and disk
+  app.post('/api/photos/upload', async (req, res) => {
+    try {
+      const record = req.body;
+      if (!record || !record.id) {
+        return res.status(400).json({ error: 'ID da foto é obrigatório.' });
+      }
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const baseUrl = `${protocol}://${host}`;
+
+      const { cloudUrl, viewerUrl } = await storePhoto(record);
+      res.status(201).json({
+        success: true,
+        photoId: record.id,
+        cloudUrl: `${baseUrl}${cloudUrl}`,
+        cloudViewerUrl: `${baseUrl}${viewerUrl}`,
+        relativeUrl: cloudUrl,
+        relativeViewerUrl: viewerUrl,
+      });
+    } catch (err: any) {
+      console.error('[Photos] Erro no upload da foto:', err);
+      res.status(500).json({ error: err.message || 'Falha ao salvar foto na nuvem.' });
+    }
+  });
+
+  // Batch upload photos for an inspection
+  app.post('/api/photos/batch-upload', async (req, res) => {
+    try {
+      const { photos } = req.body;
+      if (!Array.isArray(photos)) {
+        return res.status(400).json({ error: 'Array de fotos esperado.' });
+      }
+
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const baseUrl = `${protocol}://${host}`;
+
+      const uploaded = [];
+      for (const p of photos) {
+        if (p && p.id && (p.url || p.dataUrl)) {
+          const resInfo = await storePhoto(p);
+          uploaded.push({
+            id: p.id,
+            cloudUrl: `${baseUrl}${resInfo.cloudUrl}`,
+            cloudViewerUrl: `${baseUrl}${resInfo.viewerUrl}`,
+          });
+        }
+      }
+
+      res.json({ success: true, count: uploaded.length, photos: uploaded });
+    } catch (err: any) {
+      console.error('[Photos] Erro no batch upload de fotos:', err);
+      res.status(500).json({ error: err.message || 'Falha ao salvar fotos na nuvem.' });
+    }
+  });
+
+  // Serve raw photo image file (JPEG)
+  app.get('/api/photos/:id', async (req, res) => {
+    try {
+      const photoId = req.params.id;
+      const result = await getPhotoBuffer(photoId);
+      if (!result) {
+        return res.status(404).send('Foto não encontrada na nuvem.');
+      }
+      res.setHeader('Content-Type', result.contentType || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(result.buffer);
+    } catch (err: any) {
+      console.error('[Photos] Erro ao servir foto:', err);
+      res.status(500).send('Erro ao recuperar foto.');
+    }
+  });
+
+  // Serve interactive high-resolution photo viewer HTML (when someone clicks a photo in the PDF)
+  app.get(['/api/photos/:id/view', '/photo/:id'], async (req, res) => {
+    try {
+      const photoId = req.params.id;
+      const meta = await getPhotoMetadata(photoId);
+      const host = req.get('host') || 'localhost:3000';
+      const html = generatePhotoViewerHtml(photoId, meta, host);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (err: any) {
+      console.error('[Photos] Erro ao gerar visualizador da foto:', err);
+      res.status(500).send('Erro ao abrir visualizador da foto.');
+    }
   });
 
   // Clear database of templates and inspections (keeps registered users & companies intact)
